@@ -1,2 +1,5 @@
 # ProxyList
-Di gunakan untuk mengambil source proxy list dari beberapa web maupun git kemudian di cek apakah proxy aktif dan di list kembali ke dalam file bernama active.txt
+Used to retrieve proxy list source from various websites or Git, then checked whether the proxy is active and listed back into a file called active.txt.
+
+# License
+Licensed under MIT (LICENSE)
