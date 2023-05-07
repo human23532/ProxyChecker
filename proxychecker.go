@@ -3,7 +3,9 @@
 
     Git: https://github.com/wildy2832/ProxyChecker.git
 
-    This project Licensed undeer MIT
+    This project Licensed under MIT
+
+    (C) Copyright 2023 - Wildy Sheverando [ Wildy2832 ]
 */
 
 package proxychecker
