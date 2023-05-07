@@ -1,9 +1,9 @@
 /*
-    ProxyChecker - Used to get active proxy from public
+    ProxyChecker - Used to get active proxies from public sources.
 
     Git: https://github.com/wildy2832/ProxyChecker.git
 
-    This project Licensed under MIT
+    This project is licensed under the MIT License.
 
     (C) Copyright 2023 - Wildy Sheverando [ Wildy2832 ]
 */
@@ -23,29 +23,31 @@ import (
         "time"
 )
 
+// Struct to store proxy IP address, port, status, and active state.
 type Proxy struct {
     Ip     string
     Port   string
-    Status int // nilai status diubah menjadi integer
+    Status int // Status values: 0 = invalid, 1 = unscanned, 2 = active
     Active bool
 }
 
+// Function to check proxy status.
 func checkProxy(proxy Proxy, wg *sync.WaitGroup, errChan chan error, activeFile *os.File) {
         defer wg.Done()
 
         if proxy.Status == 2 && proxy.Active {
-                log.Printf("[%s:%s] Proxy ini telah di-scan", proxy.Ip, proxy.Port)
+                log.Printf("[%s:%s] This proxy has already been scanned.", proxy.Ip, proxy.Port)
                 return
         }
 
         if proxy.Status != 1 {
-                log.Printf("[%s:%s] Ah taiklah proxy ini tidak valid", proxy.Ip, proxy.Port)
-                proxy.Status = 0 // nilai status diubah menjadi 0 jika proxy tidak valid
+                log.Printf("[%s:%s] Invalid proxy.", proxy.Ip, proxy.Port)
+                proxy.Status = 0 // Set status to 0 if proxy is invalid
                 return
         }
 
         if proxy.Active {
-                log.Printf("[%s:%s] Proxy ini sudah ada di active.txt", proxy.Ip, proxy.Port)
+                log.Printf("[%s:%s] This proxy is already in the active.txt file.", proxy.Ip, proxy.Port)
                 return
         }
 
@@ -63,8 +65,8 @@ func checkProxy(proxy Proxy, wg *sync.WaitGroup, errChan chan error, activeFile 
                 resp, err = client.Get("http://raw.githubusercontent.com/wildy2832/testconnection/main/test.txt")
         }
         if err != nil {
-                log.Printf("[%s:%s] Tidak dapat terhubung ke github.com", proxy.Ip, proxy.Port)
-                proxy.Status = 0 // nilai status diubah menjadi 0 jika gagal terhubung ke github.com
+                log.Printf("[%s:%s] Failed connect to github.com", proxy.Ip, proxy.Port)
+                proxy.Status = 0 // Set status to 0 if failed to connect to github.com
                 return
         }
 
@@ -73,41 +75,47 @@ func checkProxy(proxy Proxy, wg *sync.WaitGroup, errChan chan error, activeFile 
         body, err := ioutil.ReadAll(resp.Body)
 
         if err != nil {
-                log.Printf("[%s:%s] Tidak dapat membaca respons dari github.com", proxy.Ip, proxy.Port)
-                proxy.Status = 0 // nilai status diubah menjadi 0 jika gagal membaca respons dari github.com
+                log.Printf("[%s:%s] Failed read response from github.com", proxy.Ip, proxy.Port)
+                proxy.Status = 0 // Set status to 0 if failed to read response from github.com
                 return
         }
 
-        if strings.TrimSpace(string(body)) != "TEST KONEKSI BERHASIL" {
-                log.Printf("[%s:%s] Respon tidak sesuai", proxy.Ip, proxy.Port)
-                proxy.Status = 0 // nilai status diubah menjadi 0 jika respons tidak sesuai
+        if strings.TrimSpace(string(body)) != "TEST CONNECTION SUCCESSFUL" {
+                log.Printf("[%s:%s] Response does not match expected value.", proxy.Ip, proxy.Port)
+                proxy.Status = 0 // Set status to 0 if response does not match expected value
                 return
         }
 
-        log.Printf("[%s:%s] Proxy ini valid", proxy.Ip, proxy.Port)
+        log.Printf("[%s:%s] Valid proxy found.", proxy.Ip, proxy.Port)
         proxy.Active = true
         if _, err := activeFile.WriteString(proxy.Ip + ":" + proxy.Port + "\n"); err != nil {
-                errChan <- fmt.Errorf("Gagal menulis ke file -> %v", err)
+                errChan <- fmt.Errorf("Failed write to file -> %v", err)
         }
-        proxy.Status = 2 // nilai status diubah menjadi 2 jika proxy valid dan belum dipindai sebelumnya
+        proxy.Status = 2 // Set status to 2 if proxy is valid and has not been scanned before
 }
 
 func main() {
+    // Open active.txt file for writing and append if file already exists.
     activeFile, err := os.OpenFile("active.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
     if err != nil {
-        log.Println("| File active.txt tidak ditemukan ->", err)
+        log.Println("| active.txt file not found ->", err)
         return
     }
     defer activeFile.Close()
 
+    // Create map to store active proxies.
     activeMap := make(map[string]bool)
+
+    // Read active proxies from active.txt file and add to activeMap.
     scanner := bufio.NewScanner(activeFile)
     for scanner.Scan() {
         activeMap[scanner.Text()] = true
     }
 
+    // Create slice to store proxy list.
     var proxyList []Proxy
 
+    // List of URLs to retrieve proxy list from.
     urls := []string{
         "https://www.proxyscan.io/download?type=http",
         "https://www.proxyscan.io/download?type=https",
@@ -125,6 +133,7 @@ func main() {
         "https://raw.githubusercontent.com/caliphdev/Proxy-List/master/socks5.txt",
     }
 
+    // Wait group and error channel.
     var wg sync.WaitGroup
     errChan := make(chan error)
 
@@ -136,24 +145,24 @@ func main() {
         }
     }()
 
-    // Looping utama
+    // Main loop.
     for {
-        // Looping untuk mengambil list proxy dari sumber yang berbeda
+        // Loop to retrieve proxy list from URLs.
         for _, u := range urls {
             resp, err := http.Get(u)
             if err != nil {
-                errChan <- fmt.Errorf("Gagal saat mengambil list proxy -> %v", err)
+                errChan <- fmt.Errorf("Failed retrieve proxy list -> %v", err)
                 continue
             }
             defer resp.Body.Close()
 
             body, err := ioutil.ReadAll(resp.Body)
             if err != nil {
-                errChan <- fmt.Errorf("Gagal membaca response %s -> %v", u, err)
+                errChan <- fmt.Errorf("Failed read response from %s -> %v", u, err)
                 continue
             }
 
-            // Memisahkan proxy menjadi IP dan port
+            // Split proxy into IP and port.
             scanner := bufio.NewScanner(strings.NewReader(string(body)))
             for scanner.Scan() {
                 proxy := scanner.Text()
@@ -167,11 +176,11 @@ func main() {
                     continue
                 }
 
-                p := Proxy{Ip: proxySplit[0], Port: proxySplit[1], Status: 1} // nilai status diatur menjadi 1 jika proxy bisa dipindai
+                p := Proxy{Ip: proxySplit[0], Port: proxySplit[1], Status: 1} // Set status to 1 if proxy is unscanned
                 _, exist := activeMap[p.Ip+p.Port]
                 if exist {
-                    log.Printf("[%s:%s] Proxy telah di-scan sebelumnya", p.Ip, p.Port)
-                    p.Status = 2 // nilai status diatur menjadi 2 jika proxy telah dipindai sebelumnya
+                    log.Printf("[%s:%s] Proxy already scanned.", p.Ip, p.Port)
+                    p.Status = 2 // Set status to 2 if proxy has been scanned before
                     continue
                 }
 
@@ -179,11 +188,11 @@ func main() {
             }
 
             if err := scanner.Err(); err != nil {
-                errChan <- fmt.Errorf("Gagal saat merequest data dari %s -> %v", u, err)
+                errChan <- fmt.Errorf("Failed request data from %s -> %v", u, err)
             }
         }
 
-        // Looping untuk melakukan pengecekan proxy
+        // Loop to check proxy status.
         for i, p := range proxyList {
             wg.Add(1)
             go func(p Proxy, i int) {
@@ -194,7 +203,7 @@ func main() {
 
         wg.Wait()
 
-        // Filterisasi proxy yang duplikat dan invalid
+        // Filter duplicate and invalid proxies.
         activeMap = make(map[string]bool)
         var filteredList []Proxy
         for _, p := range proxyList {
@@ -207,13 +216,14 @@ func main() {
 
         proxyList = filteredList
 
-        // Pause for 10 seconds before requesting again
+        // Pause for 10 seconds before requesting again.
         time.Sleep(10 * time.Second)
     }
 
+    // Error channel loop.
     go func() {
         for err := range errChan {
-            log.Println("Terjadi kesalahan ->", err)
+            log.Println("Error occurred ->", err)
         }
     }()
 }
