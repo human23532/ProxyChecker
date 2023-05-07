@@ -1,4 +1,12 @@
-package main
+/*
+    ProxyChecker - Used to get active proxy from public
+
+    Git: https://github.com/wildy2832/ProxyChecker.git
+
+    This project Licensed undeer MIT
+*/
+
+package proxychecker
 
 import (
         "bufio"
