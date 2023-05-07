@@ -8,7 +8,7 @@
     (C) Copyright 2023 - Wildy Sheverando [ Wildy2832 ]
 */
 
-package proxychecker
+package main
 
 import (
         "bufio"
